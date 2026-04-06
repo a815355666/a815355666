@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的記帳本 - 週曆版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Noto Sans TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #EFEBE9;
+        }
+        
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .bg-primary-dark { background-color: #4E342E; }
+        .bg-primary-light { background-color: #8D6E63; }
+        .text-primary-dark { color: #3E2723; }
+        .bg-accent-pink { background-color: #D7CCC8; }
+        .bg-accent-income { background-color: #C8E6C9; }
+
+        /* 週曆卡片動畫 */
+        .date-card {
+            transition: all 0.2s ease;
+        }
+        .date-card.active {
+            background-color: white;
+            color: #4E342E;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 月曆日期動畫 */
+        .month-day {
+            transition: all 0.2s;
+        }
+        .month-day.active {
+            background-color: white;
+            color: #4E342E;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Header 高度過渡動畫 */
+        #main-header {
+            transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* 隱藏/顯示的過渡 */
+        .fade-enter {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        .fade-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .fade-exit {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .fade-exit-active {
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.2s, transform 0.2s;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+    <!-- 手機容器 -->
+    <div class="relative w-full max-w-md h-[100vh] bg-[#F5F5F5] shadow-2xl overflow-hidden flex flex-col">
+        
+        <!-- Header 區域 -->
+        <!-- 初始高度 h-64，展開後會變高 -->
+        <header id="main-header" class="bg-primary-dark h-64 px-6 pt-8 pb-6 flex flex-col justify-start shrink-0 relative z-0 overflow-hidden">
+            
+            <!-- 上半部：標題與登入 -->
+            <div class="flex justify-between items-start w-full mb-4 shrink-0">
+                <!-- 左側：年份與月份 (點擊可切換) -->
+                <div class="text-white" onclick="toggleCalendarView()">
+                    <p class="text-xs opacity-80 mb-1" id="current-year-display">2026年</p>
+                    <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                        <h1 class="text-3xl font-bold tracking-wide" id="current-month-display">1月</h1>
+                        <!-- Icon 會旋轉 -->
+                        <i id="header-chevron" class="fa-solid fa-chevron-down text-sm opacity-70 mt-1 transition-transform duration-300"></i>
+                    </div>
+                </div>
+
+                <!-- 右側：登入按鈕 -->
+                <button class="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 text-white text-xs px-3 py-1.5 rounded-full transition-all">
+                    <i class="fa-regular fa-user"></i>
+                    <span>帳號登入</span>
+                </button>
+            </div>
+
+            <!-- 週曆視圖 (預設顯示) -->
+            <div id="week-view-container" class="w-full mt-auto transition-opacity duration-300">
+                <div class="flex justify-between items-center" id="calendar-strip">
+                    <!-- Javascript 動態生成 -->
+                </div>
+            </div>
+
+            <!-- 月曆視圖 (預設隱藏) -->
+            <div id="month-view-container" class="w-full hidden opacity-0 transition-opacity duration-300 mt-2">
+                <!-- 星期標題 -->
+                <div class="grid grid-cols-7 mb-2 text-center">
+                    <span class="text-xs text-white/50">日</span>
+                    <span class="text-xs text-white/50">一</span>
+                    <span class="text-xs text-white/50">二</span>
+                    <span class="text-xs text-white/50">三</span>
+                    <span class="text-xs text-white/50">四</span>
+                    <span class="text-xs text-white/50">五</span>
+                    <span class="text-xs text-white/50">六</span>
+                </div>
+                <!-- 日期網格 -->
+                <div class="grid grid-cols-7 gap-y-3 text-center" id="month-grid">
+                    <!-- Javascript 動態生成 -->
+                </div>
+            </div>
+
+        </header>
+
+        <!-- 主要內容區 (白色卡片) -->
+        <!-- 這裡加上了手勢監聽區域 -->
+        <main id="main-card" class="flex-1 bg-white -mt-8 rounded-t-[30px] relative z-10 flex flex-col shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)] overflow-hidden transition-all duration-300">
+            
+            <!-- 裝飾用拉條 (手勢觸發區) -->
+            <div id="drag-handle" class="w-full flex justify-center pt-4 pb-2 cursor-grab active:cursor-grabbing touch-none">
+                <div class="w-12 h-1.5 bg-gray-200 rounded-full"></div>
+            </div>
+
+            <!-- 交易列表 -->
+            <div class="flex-1 overflow-y-auto no-scrollbar px-6 pt-0 pb-24" id="transaction-list">
+                
+                <div class="text-xs font-bold text-gray-400 mt-2 mb-3 ml-1">今天</div>
+
+                <div class="flex items-center justify-between group cursor-pointer border-b-[1.5px] border-[#8A7878]/20 pb-4 mb-4" data-date="2026-01-04">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-[#8D6E63] rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-mug-hot text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-primary-dark font-bold text-lg">早餐</span>
+                            <span class="text-gray-400 text-xs">路易莎咖啡</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <span class="bg-[#D7CCC8] text-[#3E2723] px-3 py-0.5 rounded-full font-bold text-sm min-w-[80px] text-center">
+                            - $120
+                        </span>
+                        <span class="text-gray-400 text-xs tracking-wider">今日 09:30</span>
+                    </div>
+                </div>
+
+                <div class="text-xs font-bold text-gray-400 mt-2 mb-3 ml-1">稍早</div>
+
+                <div class="flex items-center justify-between group cursor-pointer border-b-[1.5px] border-[#8A7878]/20 pb-4 mb-4" data-date="2026-01-03">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-[#8D6E63] rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-shirt text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-primary-dark font-bold text-lg">服飾</span>
+                            <span class="text-gray-400 text-xs">Uniqlo 冬季外套</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <span class="bg-[#D7CCC8] text-[#3E2723] px-3 py-0.5 rounded-full font-bold text-sm min-w-[80px] text-center">
+                            - $3,400
+                        </span>
+                        <span class="text-gray-400 text-xs tracking-wider">2026/01/03</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between group cursor-pointer border-b-[1.5px] border-[#8A7878]/20 pb-4 mb-4" data-date="2026-01-02">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-[#8D6E63] rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-gamepad text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-primary-dark font-bold text-lg">娛樂</span>
+                            <span class="text-gray-400 text-xs">Steam 冬季特賣</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <span class="bg-[#D7CCC8] text-[#3E2723] px-3 py-0.5 rounded-full font-bold text-sm min-w-[80px] text-center">
+                            - $6,000
+                        </span>
+                        <span class="text-gray-400 text-xs tracking-wider">2026/01/02</span>
+                    </div>
+                </div>
+
+                 <div class="flex items-center justify-between group cursor-pointer border-b-[1.5px] border-[#8A7878]/20 pb-4 mb-4" data-date="2026-01-01">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-[#8D6E63] rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-bolt text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-primary-dark font-bold text-lg">水電費</span>
+                            <span class="text-gray-400 text-xs">12月份電費帳單</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <span class="bg-[#D7CCC8] text-[#3E2723] px-3 py-0.5 rounded-full font-bold text-sm min-w-[80px] text-center">
+                            - $1,200
+                        </span>
+                        <span class="text-gray-400 text-xs tracking-wider">2026/01/01</span>
+                    </div>
+                </div>
+
+                 <div class="flex items-center justify-between group cursor-pointer pb-4" data-date="2026-01-01">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-[#5D4037] rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-wallet text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-primary-dark font-bold text-lg">薪資</span>
+                            <span class="text-gray-400 text-xs">一月份薪水入帳</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <span class="bg-[#C8E6C9] text-[#1B5E20] px-3 py-0.5 rounded-full font-bold text-sm min-w-[80px] text-center">
+                            + $50,000
+                        </span>
+                        <span class="text-gray-400 text-xs tracking-wider">2026/01/01</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 底部統計欄 -->
+            <div class="absolute bottom-0 left-0 w-full bg-[#B86A6A]/80 backdrop-blur-md shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] border-t border-white/20 pb-8 pt-4 px-8 z-20">
+                <div class="flex justify-between items-center">
+                    <div class="flex flex-col">
+                        <span class="text-xs text-white/80 font-medium mb-1">本月支出總計</span>
+                        <span class="text-2xl font-bold text-white tracking-tight">
+                            $ <span id="total-expense">10,720</span>
+                        </span>
+                    </div>
+                    <div class="w-[1px] h-10 bg-white/30"></div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-xs text-white/80 font-medium mb-1">本月收入總計</span>
+                        <span class="text-2xl font-bold text-white tracking-tight">
+                            $ <span id="total-income">50,000</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 浮動新增按鈕 -->
+            <button onclick="showToast('功能開發中...')" class="absolute bottom-28 right-6 w-14 h-14 bg-[#4E342E] rounded-full text-white shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-30">
+                <i class="fa-solid fa-plus text-2xl"></i>
+            </button>
+
+        </main>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed top-10 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg text-sm opacity-0 transition-opacity duration-300 pointer-events-none z-50 shadow-lg">
+        功能開發中...
+    </div>
+
+    <script>
+        // --- 設定 ---
+        const today = new Date(); 
+        const transactionDates = new Set([
+            '2026-01-01', '2026-01-02', '2026-01-03',
+            new Date().toISOString().split('T')[0]
+        ]);
+
+        let isMonthView = false;
+        let selectedDateStr = new Date().toISOString().split('T')[0]; // 記錄目前選中的日期
+
+        // --- 初始化 ---
+        function init() {
+            initWeekCalendar();
+            initMonthCalendar();
+            setupGestures();
+        }
+
+        // --- 1. 週曆渲染  ---
+        function initWeekCalendar() {
+            const container = document.getElementById('calendar-strip');
+            const weekDays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+            container.innerHTML = '';
+
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                
+                const dayNum = date.getDate();
+                const dayName = weekDays[date.getDay()];
+                const dateString = date.toISOString().split('T')[0];
+                const hasData = transactionDates.has(dateString);
+                const isSelected = (dateString === selectedDateStr);
+
+                const el = document.createElement('div');
+                el.className = `date-card flex flex-col items-center justify-center w-12 h-16 rounded-2xl cursor-pointer ${isSelected ? 'active bg-white text-[#4E342E] shadow-sm' : 'text-white/70 hover:bg-white/10'}`;
+                el.onclick = () => selectDate(dateString);
+
+                el.innerHTML = `
+                    <span class="text-[10px] font-medium mb-0.5">${dayName}</span>
+                    <span class="text-xl font-bold leading-none">${dayNum}</span>
+                    <div class="mt-1 w-1.5 h-1.5 rounded-full ${hasData ? (isSelected ? 'bg-[#4E342E]' : 'bg-white') : 'bg-transparent'}"></div>
+                `;
+                el.dataset.date = dateString; // 方便更新樣式
+                container.appendChild(el);
+            }
+        }
+
+        // --- 2. 月曆渲染 (新功能) ---
+        function initMonthCalendar() {
+            const container = document.getElementById('month-grid');
+            container.innerHTML = '';
+
+            const year = today.getFullYear();
+            const month = today.getMonth(); // 0-based
+
+            // 取得本月第一天是星期幾
+            const firstDay = new Date(year, month, 1).getDay();
+            // 取得本月有幾天
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // 填充前面的空白
+            for (let i = 0; i < firstDay; i++) {
+                const spacer = document.createElement('div');
+                container.appendChild(spacer);
+            }
+
+            // 填充日期
+            for (let d = 1; d <= daysInMonth; d++) {
+                const date = new Date(year, month, d);
+                // 修正時區問題，確保 dateString 正確
+                const dateString = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                
+                const hasData = transactionDates.has(dateString);
+                const isSelected = (dateString === selectedDateStr);
+                const isToday = (dateString === new Date().toISOString().split('T')[0]);
+
+                const el = document.createElement('div');
+                // month-day 類別
+                el.className = `month-day w-8 h-8 mx-auto flex items-center justify-center rounded-full text-sm cursor-pointer relative ${isSelected ? 'active bg-white text-[#4E342E]' : 'text-white hover:bg-white/20'}`;
+                
+                // 如果是今天但沒被選中，加個外框
+                if (isToday && !isSelected) {
+                    el.classList.add('border', 'border-white/50');
+                }
+
+                el.onclick = () => {
+                    selectDate(dateString);
+                    // 在月曆模式下點選不一定要收合，看使用習慣，這裡保持展開方便查看
+                };
+                el.dataset.date = dateString;
+
+                // 內容
+                el.innerHTML = `
+                    ${d}
+                    ${hasData ? `<div class="absolute bottom-0.5 w-1 h-1 rounded-full ${isSelected ? 'bg-[#4E342E]' : 'bg-white'}"></div>` : ''}
+                `;
+
+                container.appendChild(el);
+            }
+        }
+
+        // --- 3. 統一選取邏輯 ---
+        function selectDate(dateStr) {
+            selectedDateStr = dateStr; // 更新當前選中
+
+            // 1. 更新週曆樣式
+            document.querySelectorAll('#week-view-container .date-card').forEach(el => {
+                const isThis = el.dataset.date === dateStr;
+                const dot = el.querySelector('div:last-child');
+                
+                if (isThis) {
+                    el.className = 'date-card flex flex-col items-center justify-center w-12 h-16 rounded-2xl cursor-pointer active bg-white text-[#4E342E] shadow-sm';
+                    if (dot && dot.classList.contains('bg-white')) {
+                        dot.classList.remove('bg-white'); dot.classList.add('bg-[#4E342E]');
+                    }
+                } else {
+                    el.className = 'date-card flex flex-col items-center justify-center w-12 h-16 rounded-2xl cursor-pointer text-white/70 hover:bg-white/10';
+                    if (dot && dot.classList.contains('bg-[#4E342E]')) {
+                        dot.classList.remove('bg-[#4E342E]'); dot.classList.add('bg-white');
+                    }
+                }
+            });
+
+            // 2. 更新月曆樣式
+            document.querySelectorAll('#month-grid .month-day').forEach(el => {
+                const isThis = el.dataset.date === dateStr;
+                const hasData = transactionDates.has(dateStr);
+                
+                // 找出圓點元素 (innerHTML string 裡面的 div)
+                // 這裡簡單重繪 innerHTML 或切換 class
+                if (isThis) {
+                    el.classList.add('active', 'bg-white', 'text-[#4E342E]');
+                    el.classList.remove('text-white', 'hover:bg-white/20', 'border', 'border-white/50');
+                    // 更新圓點顏色
+                    const dot = el.querySelector('div');
+                    if(dot) { dot.classList.remove('bg-white'); dot.classList.add('bg-[#4E342E]'); }
+                } else {
+                    el.classList.remove('active', 'bg-white', 'text-[#4E342E]');
+                    el.classList.add('text-white', 'hover:bg-white/20');
+                    // 恢復今天的外框
+                    if (el.dataset.date === new Date().toISOString().split('T')[0]) {
+                        el.classList.add('border', 'border-white/50');
+                    }
+                    // 恢復圓點顏色
+                    const dot = el.querySelector('div');
+                    if(dot) { dot.classList.remove('bg-[#4E342E]'); dot.classList.add('bg-white'); }
+                }
+            });
+
+            showToast(`已切換至: ${dateStr}`);
+        }
+
+        // --- 4. 切換視圖邏輯 ---
+        function toggleCalendarView() {
+            const header = document.getElementById('main-header');
+            const weekView = document.getElementById('week-view-container');
+            const monthView = document.getElementById('month-view-container');
+            const chevron = document.getElementById('header-chevron');
+
+            isMonthView = !isMonthView;
+
+            if (isMonthView) {
+                // 展開
+                header.classList.remove('h-64');
+                header.classList.add('h-[420px]'); // 給予足夠高度顯示月曆
+                
+                weekView.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => {
+                    weekView.classList.add('hidden');
+                    monthView.classList.remove('hidden');
+                    // 強制重繪以觸發 opacity transition
+                    void monthView.offsetWidth; 
+                    monthView.classList.remove('opacity-0');
+                }, 150); // 等待淡出
+
+                chevron.classList.add('rotate-180');
+
+            } else {
+                // 收合
+                header.classList.remove('h-[420px]');
+                header.classList.add('h-64');
+
+                monthView.classList.add('opacity-0');
+                setTimeout(() => {
+                    monthView.classList.add('hidden');
+                    weekView.classList.remove('hidden', 'pointer-events-none');
+                    void weekView.offsetWidth;
+                    weekView.classList.remove('opacity-0');
+                }, 150);
+
+                chevron.classList.remove('rotate-180');
+            }
+        }
+
+        // --- 5. 手勢滑動偵測 ---
+        function setupGestures() {
+            const handle = document.getElementById('drag-handle');
+            const header = document.getElementById('main-header');
+            
+            let startY = 0;
+            let currentY = 0;
+            let isDragging = false;
+
+            // Touch Events
+            handle.addEventListener('touchstart', (e) => {
+                startY = e.touches[0].clientY;
+                isDragging = true;
+            }, {passive: true});
+
+            handle.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                currentY = e.touches[0].clientY;
+                const diff = currentY - startY;
+
+                // 簡單的阻尼效果或即時回饋可以寫在這，這裡簡化處理：
+                // 只有在 touchend 時決定是否切換
+            }, {passive: true});
+
+            handle.addEventListener('touchend', (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                // 判斷滑動距離
+                const diff = currentY - startY;
+                
+                // 如果向下拉超過 50px 且目前沒展開 -> 展開
+                if (diff > 50 && !isMonthView) {
+                    toggleCalendarView();
+                }
+                // 如果向上拉超過 50px 且目前已展開 -> 收合
+                else if (diff < -50 && isMonthView) {
+                    toggleCalendarView();
+                }
+                
+                // 重置
+                startY = 0;
+                currentY = 0;
+            });
+
+            // Mouse Events (為了桌面測試方便)
+            handle.addEventListener('mousedown', (e) => {
+                startY = e.clientY;
+                isDragging = true;
+                handle.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                currentY = e.clientY;
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (!isDragging) return;
+                isDragging = false;
+                handle.style.cursor = 'grab';
+
+                const diff = currentY - startY;
+                if (diff > 50 && !isMonthView) {
+                    toggleCalendarView();
+                } else if (diff < -50 && isMonthView) {
+                    toggleCalendarView();
+                }
+                startY = 0; currentY = 0;
+            });
+        }
+
+        // --- 工具 ---
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg || '功能開發中...';
+            toast.classList.remove('opacity-0');
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 1500);
+        }
+
+        document.querySelectorAll('#transaction-list > div[data-date]').forEach(item => {
+            item.addEventListener('click', () => {
+                item.style.backgroundColor = '#F5F5F5';
+                setTimeout(() => { item.style.backgroundColor = 'transparent'; }, 200);
+            });
+        });
+
+        // 啟動
+        init();
+
+    </script>
+</body>
+</html>
